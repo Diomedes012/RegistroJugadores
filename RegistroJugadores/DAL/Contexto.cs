@@ -9,6 +9,12 @@ namespace RegistroJugadores.DAL
         {
         }
         public DbSet<Jugadores> Jugadores { get; set; }
-       
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Jugadores>()
+                .HasIndex(j => j.Nombres)
+                .IsUnique();
+        }
     }
 }

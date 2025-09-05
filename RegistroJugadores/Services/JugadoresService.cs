@@ -7,7 +7,7 @@ namespace RegistroJugadores.Services
 {
     public class JugadoresService(IDbContextFactory<Contexto> DbFactory)
     {
-        public async Task<bool> Guardad(Jugadores jugador)
+        public async Task<bool> Guardar(Jugadores jugador)
         {
             if(!await Existe(jugador.JugadorId))
             {

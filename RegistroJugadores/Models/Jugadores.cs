@@ -7,8 +7,15 @@ namespace RegistroJugadores.Models
         [Key]
         public int JugadorId { get; set; }
         [Required(ErrorMessage = "El campo JugadoId es obligatorio")]
-        public string Nombres { get; set; }
 
+
+        
+        public string Nombres { get; set; }
+        [Required(ErrorMessage = "El campo Nombres es obligatorio")]
+
+        [Range(0, int.MaxValue, ErrorMessage = "El campo Ganadas no puede ser negativo")]
         public int Partidas { get; set; }
+        
     }
 }
+
