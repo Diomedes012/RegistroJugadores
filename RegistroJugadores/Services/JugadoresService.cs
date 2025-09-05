@@ -55,7 +55,7 @@ namespace RegistroJugadores.Services
         public async Task<List<Jugadores>> Listar(Expression<Func<Jugadores, bool>> criterio)
         {
             await using var contexto = await DbFactory.CreateDbContextAsync();
-            return await contexto.Jugadores.AsNoTracking().ToListAsync();
+            return await contexto.Jugadores.Where(criterio).AsNoTracking().ToListAsync();
         }
     }
 }

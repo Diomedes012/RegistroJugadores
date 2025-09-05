@@ -2,6 +2,7 @@
 
 @inject JugadoresService jugadoresService
 @inject NavigationManager navigationManager
+@rendermode InteractiveServer
 
 <PageTitle>Registro de Jugadores</PageTitle>
 <div class="container">
@@ -12,19 +13,99 @@
 			<h5 class="card-title">Registro de Jugadores</h5>
 			<a href="/Jugador/Crear" class="btn btn-primary"><span class="bi bi-plus-square-fill-nav-menu mt-3"></span>Crear</a>
 		</div>
-		
+
 		@*Body*@
 		<div class="card-body">
 
 			@*Labels*@
 			<div class="row">
+				@*Filtrar por*@
+				<div class="col-3">
+					<label class="col-form-label"><strong>Filtrar por</strong></label>
+				</div>
+				@*Valor Filtro*@
+				<div class="col-4">
+					<label class="col-form-label"><strong>Busqueda</strong></label>
+				</div>
+			</div>
+
+			@*Inputs y Botones*@
+			<div class="row align-items-center">
+				@*Filtro*@
+				<div class="col-3">
+					<InputSelect class="from-select" @bind-Value="Filtro">
+						<option value="" selected disabled>Elija una opcion</option>
+						<option value="Id">ID</option>
+						<option value="Nombres">Nombres</option>
+					</InputSelect>
+				</div>
+
+				@*Busqueda*@
+				<div class="col-4">
+					<div class="input-group">
+						<input class="form-control" @bind="ValorFiltro" placeholder="Buscar" />
+						<button type="button" class="btn btn-outline-primary bi bi-search" @onclick="async () => await Buscar()"></button>
+					</div>
+				</div>
 
 			</div>
 
+			<table class="table table-hover">
+				<thead class="table table-striped text-black">
+					<tr>
+						<th>JugadorId</th>
+						<th>Nombres</th>
+						<th>Partidas</th>
+					</tr>
+				</thead>
+				<tbody>
+					@foreach (var jugador in ListaJugadores)
+					{
+						<tr>
+							<td>@jugador.JugadorId</td>
+							<td>@jugador.Nombres</td>
+							<td>@jugador.Partidas</td>
+
+							<td class="text-center">
+								<a href="/Jugador/Edit/@jugador.JugadorId" class="btn btn-outline-primary bi bi-pencil-square"></a>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+
+		<div class="card-footer spacebetween">
+			<label> Cantidad de Jugadores: @ListaJugadores.Count()</label>
 		</div>
 	</div>
 </div>
 
 @code {
+	public string Filtro { get; set; } = string.Empty;
+	public string ValorFiltro { get; set; } = string.Empty;
+	public List<Jugadores> ListaJugadores { get; set; } = new List<Jugadores>();
 
+	protected override async Task OnInitializedAsync()
+	{
+		ListaJugadores = await jugadoresService.Listar(j => true);
+	}
+
+	private async Task Buscar()
+	{
+		if (ValorFiltro == string.Empty)
+		{
+			ListaJugadores = await jugadoresService.Listar(j => true);
+			return;
+		}
+		if (Filtro == "Id")
+		{
+			int id = int.Parse(ValorFiltro);
+			ListaJugadores = await jugadoresService.Listar(d => d.JugadorId == id);
+		}
+		else if (Filtro == "Nombres")
+		{
+			ListaJugadores = await jugadoresService.Listar(d => d.Nombres.Contains(ValorFiltro));
+		}
+	}
 }
