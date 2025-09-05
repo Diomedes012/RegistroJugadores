@@ -1,5 +1,6 @@
 using RegistroJugadores.Components;
 using RegistroJugadores.DAL;
+using RegistroJugadores.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace RegistroJugadores
@@ -14,8 +15,14 @@ namespace RegistroJugadores
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
+            //Obtener el ConStr para usarlo en el contexto
             var ConStr = builder.Configuration.GetConnectionString("SqlConStr");
+
+            //Agregamos el contexto al builder con el ConStr
             builder.Services.AddDbContextFactory<Contexto>(o => o.UseSqlServer(ConStr));
+
+            //Inyeccion del service
+            builder.Services.AddScoped<JugadoresService>();
 
             var app = builder.Build();
 
