@@ -46,6 +46,8 @@
 	public string Mensaje { get; set; } = string.Empty;
 	public List<Jugadores> ListaJugadores { get; set; } = new List<Jugadores>();
 
+	public string MensajeCssClass { get; set; } = string.Empty;
+
 	protected override async Task OnInitializedAsync()
 	{
 		ListaJugadores = await jugadoresService.Listar(d => d.JugadorId > 0);
@@ -56,14 +58,15 @@
 		var creado = await jugadoresService.Guardar(jugador);
 
 		if(creado)
-		{
-			//toastService.ShowSuccess("Jugador Creado Exitosamente");
+		{	
 			navigationManager.NavigateTo("/Jugador/Index");
 		}
 		else
 		{
-			//toastService.ShowError("No se pudo guardar correctamente");
+			
 			Mensaje = "No se pudo guardar correctamente";
+			MensajeCssClass = "alert alert-danger";
+			
 		}
 	}
 }
