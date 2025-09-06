@@ -11,6 +11,10 @@ namespace RegistroJugadores
         {
             var builder = WebApplication.CreateBuilder(args);
 
+
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+            builder.WebHost.UseUrls($"http://*:{port}");
+
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
