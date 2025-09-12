@@ -1,7 +1,6 @@
 ﻿using  System.ComponentModel.DataAnnotations;
 
-namespace RegistroJugadores.Models
-{
+namespace RegistroJugadores.Models;
     public class Jugadores
     {
         [Key]
@@ -17,5 +16,4 @@ namespace RegistroJugadores.Models
         public int Partidas { get; set; }
         
     }
-}
 

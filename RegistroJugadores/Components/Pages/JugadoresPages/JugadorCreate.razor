@@ -41,6 +41,17 @@
 		</div>
 	</div>
 </EditForm>
+
+
+<div class="text-center mt-3">
+	@if (!string.IsNullOrEmpty(Mensaje))
+	{
+		<div class="@MensajeCssClass" role="alert">
+			@Mensaje
+		</div>
+	}
+</div>
+
 @code {
 	public Jugadores jugador { get; set; } = new Jugadores();
 	public string Mensaje { get; set; } = string.Empty;
@@ -55,6 +66,15 @@
 
 	public async void Guardar()
 	{
+		bool nombreRepetido = await jugadoresService.ExisteNombre(jugador.JugadorId, jugador.Nombres);
+
+		if(nombreRepetido)
+		{
+			Mensaje = "No se pudo guardar, el nombre del jugador ya existe";
+			MensajeCssClass = "alert alert-danger";
+			return;
+		}
+
 		var creado = await jugadoresService.Guardar(jugador);
 
 		if(creado)

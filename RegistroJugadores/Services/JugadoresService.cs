@@ -3,18 +3,13 @@ using RegistroJugadores.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
-namespace RegistroJugadores.Services
-{
+namespace RegistroJugadores.Services;
+
     public class JugadoresService(IDbContextFactory<Contexto> DbFactory)
     {
         public async Task<bool> Guardar(Jugadores jugador)
         {
             await using var contexto = await DbFactory.CreateDbContextAsync();
-
-            if (await ExisteNombre(jugador.JugadorId, jugador.Nombres))
-            {
-                return false; // El nombre ya está en uso
-            }
 
             if (!await Existe(jugador.JugadorId))
             {
@@ -35,7 +30,7 @@ namespace RegistroJugadores.Services
 
         }
 
-        private async Task<bool> ExisteNombre(int id, string nombres)
+        public async Task<bool> ExisteNombre(int id, string nombres)
         {
             await using var contexto = await DbFactory.CreateDbContextAsync();
             return await contexto.Jugadores
@@ -82,4 +77,3 @@ namespace RegistroJugadores.Services
                 .ToListAsync();
         }
     }
-}

@@ -3,8 +3,7 @@ using RegistroJugadores.DAL;
 using RegistroJugadores.Services;
 using Microsoft.EntityFrameworkCore;
 
-namespace RegistroJugadores
-{
+namespace RegistroJugadores;
     public class Program
     {
         public static void Main(string[] args)
@@ -45,4 +44,3 @@ namespace RegistroJugadores
             app.Run();
         }
     }
-}
