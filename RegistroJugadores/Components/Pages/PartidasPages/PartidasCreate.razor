@@ -57,7 +57,7 @@
 
 			@*Footer*@
 			<div class="card-footer" text-center mt-2>
-				<a href="/Partidas" class="btn btn-secundary">
+				<a href="/Partidas/Index" class="btn btn-secundary">
 					<span class="bi bi-arrow-left"></span> Volver
 				</a>
 				<button type="submit" class="btn btn-primary">
@@ -91,7 +91,7 @@
 		jugadores = await jugadoresService.Listar(criterio => true);
 
 		partida.EstadoPartida = "En Espera";
-		partida.EstadoTablero = ".........";
+		partida.EstadoTablero = "#######";
 
 		if(JugadorId.HasValue)
 		{
@@ -114,9 +114,8 @@
 
 		if(guardado)
 		{
-			Mensaje = "Se ha creado la partida exitosamente";
-			MensajeCssClass = "alert alert-success";
 			partida = new Partidas();
+			navigationManager.NavigateTo("Partidas/Index");
 		}
 		else
 		{

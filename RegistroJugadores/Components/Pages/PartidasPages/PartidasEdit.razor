@@ -1,0 +1,175 @@
+﻿@page "/Partidas/Edit/{PartidaId:int}"
+@inject PartidasService partidasService
+@inject JugadoresService jugadoresService
+@inject NavigationManager navigationManager
+@inject IJSRuntime JSRuntime
+
+@rendermode InteractiveServer
+
+<PageTitle>Editar Partida</PageTitle>
+
+@if (Partida != null && jugadores.Any())
+{
+	<div class="card shadow-lg">
+		@*Header*@
+		<div class="card-header bg-black text-white">
+			<h3 class="mb-0">
+				<i class="oi oi-pencil me-2"></i>Editar Partida
+			</h3>
+		</div>
+
+		@*Body*@
+		<div class="card-body">
+			<EditForm Model="Partida" OnValidSubmit="Modificar">
+				<DataAnnotationsValidator />
+
+				@*PartidaId*@
+				<div class="form-group mb-3">
+					<label for="partidaId" class="form-label">PartidaId:</label>
+					<InputNumber id="partidaId" class="form-control" @bind-Value="Partida.PartidaId" readonly />
+				</div>
+
+				@*Jugador 1*@
+				<div class="form-group mb-3">
+					<label for="jugador1" class="form-label">Jugador 1:</label>
+					<InputSelect id="jugador1" class="form-select" @bind-Value="Partida.Jugador1Id">
+						<option value="0">Seleccione un jugador...</option>
+						@foreach (var jugador in jugadores)
+						{
+							<option value="@jugador.JugadorId">@jugador.Nombres</option>
+						}
+					</InputSelect>
+					<ValidationMessage For="@(() => Partida.Jugador1Id)" />
+				</div>
+
+				@*Jugador 2*@
+				<div class="form-group mb-3">
+					<label for="jugador2" class="form-label">Jugador 2:</label>
+					<InputSelect id="jugador2" class="form-select" @bind-Value="Partida.Jugador2Id">
+						<option value="">Seleccione un jugador...</option>
+						@foreach (var jugador in jugadores)
+						{
+							<option value="@jugador.JugadorId">@jugador.Nombres</option>
+						}
+					</InputSelect>
+					<ValidationMessage For="@(() => Partida.Jugador2Id)" />
+				</div>
+
+				@*Estado Partida*@
+				<div class="form-group mb-3">
+					<label for="estadoPartida" class="form-label">Estado de la Partida:</label>
+					<InputText id="estadoPartida" class="form-control" @bind-Value="Partida.EstadoPartida" />
+					<ValidationMessage For="@(() => Partida.EstadoPartida)" />
+				</div>
+
+				@*Ganador*@
+				<div class="form-group mb-3">
+					<label for="ganador" class="form-label">Ganador:</label>
+					<InputSelect id="ganador" class="form-select" @bind-Value="Partida.GanadorId">
+						<option value="">Seleccione un jugador...</option>
+						@foreach (var jugador in jugadores)
+						{
+							<option value="@jugador.JugadorId">@jugador.Nombres</option>
+						}
+					</InputSelect>
+					<ValidationMessage For="@(() => Partida.GanadorId)" />
+				</div>
+
+				@*Turno Jugador*@
+				<div class="form-group mb-3">
+					<label for="turnoJugador" class="form-label">Turno del Jugador:</label>
+					<InputSelect id="turnoJugador" class="form-select" @bind-Value="Partida.TurnoJugadorId">
+						<option value="0">Seleccione un jugador...</option>
+						@foreach (var jugador in jugadores)
+						{
+							<option value="@jugador.JugadorId">@jugador.Nombres</option>
+						}
+					</InputSelect>
+					<ValidationMessage For="@(() => Partida.TurnoJugadorId)" />
+				</div>
+
+				@*Estado Tablero*@
+				<div class="form-group mb-3">
+					<label for="estadoTablero" class="form-label">Estado del Tablero:</label>
+					<InputText id="estadoTablero" class="form-control" @bind-Value="Partida.EstadoTablero" />
+					<ValidationMessage For="@(() => Partida.EstadoTablero)" />
+				</div>
+
+				<div class="d-flex justify-content-between mt-4">
+					<div>
+						<button type="button" class="btn btn-danger me-2" @onclick="Eliminar">
+							<i class="oi oi-trash me-2"></i>Eliminar
+						</button>
+					</div>
+					<div>
+						<button type="submit" class="btn btn-primary bi bi-floppy"> Modificar</button>
+						<a href="/Partidas/Index" class="btn btn-secondary">
+							<i class="oi oi-arrow-left me-2"></i>Volver
+						</a>
+					</div>
+				</div>
+			</EditForm>
+		</div>
+
+		<div class="card-footer">
+			<label class="@MensajeCssClass mt-2">@Mensaje</label>
+		</div>
+	</div>
+}
+
+@code {
+	[Parameter]
+	public int PartidaId { get; set; }
+
+	public Partidas Partida { get; set; }
+	public List<Jugadores> jugadores { get; set; } = new List<Jugadores>();
+	public string Mensaje { get; set; } = string.Empty;
+	public string MensajeCssClass { get; set; } = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		jugadores = await jugadoresService.Listar(j => true);
+		Partida = await partidasService.Buscar(PartidaId);
+
+		if (Partida == null)
+		{
+			Mensaje = "La partida que intenta editar no existe.";
+			MensajeCssClass = "alert-warning";
+		}
+	}
+
+	public async Task Modificar()
+	{
+		bool modificado = await partidasService.Guardar(Partida);
+
+		if (modificado)
+		{
+			Mensaje = "Se ha modificado la partida exitosamente.";
+			MensajeCssClass = "alert alert-success";
+		}
+		else
+		{
+			Mensaje = "No se ha podido modificar la partida.";
+			MensajeCssClass = "alert alert-danger";
+		}
+	}
+
+	private async Task Eliminar()
+	{
+		bool confirmado = await JSRuntime.InvokeAsync<bool>("confirm", "¿Está seguro que desea eliminar esta partida? Esta acción no se puede deshacer.");
+
+		if (confirmado)
+		{
+			bool eliminado = await partidasService.Eliminar(Partida.PartidaId);
+			if (eliminado)
+			{
+				navigationManager.NavigateTo("/Partidas/Index");
+			}
+			else
+			{
+				Mensaje = "No se ha podido eliminar correctamente.";
+				MensajeCssClass = "alert alert-danger";
+			}
+		}
+	}
+}
