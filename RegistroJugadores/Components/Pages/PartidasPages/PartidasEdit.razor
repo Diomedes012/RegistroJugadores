@@ -95,6 +95,13 @@
 					<ValidationMessage For="@(() => Partida.EstadoTablero)" />
 				</div>
 
+				@*Fecha de Fin*@
+				<div class="form-group mb-3">
+					<label for="fechaFin" class="form-label">Fecha de Fin:</label>
+					<InputDate id="fechaFin" class="form-control" @bind-Value="Partida.FechaFin" />
+					<ValidationMessage For="@(() => Partida.FechaFin)" />
+				</div>
+
 				<div class="d-flex justify-content-between mt-4">
 					<div>
 						<button type="button" class="btn btn-danger me-2" @onclick="Eliminar">
@@ -111,6 +118,7 @@
 			</EditForm>
 		</div>
 
+		@*Footer*@
 		<div class="card-footer">
 			<label class="@MensajeCssClass mt-2">@Mensaje</label>
 		</div>
