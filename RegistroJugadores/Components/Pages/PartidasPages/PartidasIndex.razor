@@ -1,0 +1,124 @@
+﻿@page "/Partidas/Index"
+@inject PartidasService partidasService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Registro de Partidas</PageTitle>
+
+<div class="container">
+	<div class="card shadow-lg">
+
+		@*Header*@
+		<div class="card-header space-between">
+			<h5 class="card-title">Registro de Partidas</h5>
+			<a href="/Partidas/Crear" class="btn btn-primary">
+				<span class="bi bi-plus-square-fill-nav-menu mt-3"></span>Crear
+			</a>
+		</div>
+
+		@*Body*@
+		<div class="card-body">
+
+			@*Labels*@
+			<div class="row">
+				@*Filtrar por*@
+				<div class="col-3">
+					<label class="col-form-label"><strong>Filtrar por</strong></label>
+				</div>
+				@*Valor Filtro*@
+				<div class="col-4">
+					<label class="col-form-label"><strong>Búsqueda</strong></label>
+				</div>
+			</div>
+
+			@*Inputs y Botones*@
+			<div class="row align-items-center">
+				@*Filtro*@
+				<div class="col-3">
+					<InputSelect class="from-select" @bind-Value="Filtro">
+						<option value="" selected disabled>Elija una opción</option>
+						<option value="Id">ID</option>
+						<option value="EstadoPartida">Estado Partida</option>
+					</InputSelect>
+				</div>
+
+				@*Búsqueda*@
+				<div class="col-4">
+					<div class="input-group">
+						<input class="form-control" @bind="ValorFiltro" placeholder="Buscar" />
+						<button type="button" class="btn btn-outline-primary bi bi-search" @onclick="async () => await Buscar()"></button>
+					</div>
+				</div>
+			</div>
+
+			<table class="table table-hover mt-3">
+				<thead class="table table-striped text-black">
+					<tr>
+						<th>PartidaId</th>
+						<th>Jugador 1</th>
+						<th>Jugador 2</th>
+						<th>Ganador</th>
+						<th>Estado</th>
+						<th>Editar</th>
+					</tr>
+				</thead>
+				<tbody>
+					@foreach (var partida in ListaPartidas)
+					{
+						<tr>
+							<td>@partida.PartidaId</td>
+							<td>@partida.Jugador1.Nombres</td>
+							<td>@(partida.Jugador2?.Nombres ?? "N/A")</td>
+							<td>@(partida.Ganador?.Nombres ?? "N/A")</td>
+							<td>@partida.EstadoPartida</td>
+
+							<td class="text-center">
+								<a href="/Partidas/Edit/@partida.PartidaId" class="btn btn-outline-primary bi bi-pencil-square"></a>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+
+		<div class="card-footer spacebetween">
+			<label> Cantidad de Partidas: @ListaPartidas.Count()</label>
+		</div>
+	</div>
+</div>
+
+@code {
+	public string Filtro { get; set; } = string.Empty;
+	public string ValorFiltro { get; set; } = string.Empty;
+	public List<Partidas> ListaPartidas { get; set; } = new List<Partidas>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		ListaPartidas = await partidasService.Listar(partida => true);
+	}
+
+	private async Task Buscar()
+	{
+		if (ValorFiltro == string.Empty)
+		{
+			ListaPartidas = await partidasService.Listar(partidasService => true);
+			return;
+		}
+
+		if (Filtro == "Id")
+		{
+			if (int.TryParse(ValorFiltro, out int id))
+			{
+				ListaPartidas = await partidasService.Listar(p => p.PartidaId == id);
+			}
+			else
+			{
+				ListaPartidas = new List<Partidas>();
+			}
+		}
+		else if (Filtro == "EstadoPartida")
+		{
+			ListaPartidas = await partidasService.Listar(p => p.EstadoPartida.Contains(ValorFiltro));
+		}
+	}
+}

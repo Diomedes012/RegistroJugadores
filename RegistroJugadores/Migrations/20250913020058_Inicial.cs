@@ -6,11 +6,25 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace RegistroJugadores.Migrations
 {
     /// <inheritdoc />
-    public partial class PartidasInicial : Migration
+    public partial class Inicial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "Jugadores",
+                columns: table => new
+                {
+                    JugadorId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Nombres = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Partidas = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Jugadores", x => x.JugadorId);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Partidas",
                 columns: table => new
@@ -38,8 +52,7 @@ namespace RegistroJugadores.Migrations
                         name: "FK_Partidas_Jugadores_Jugador1Id",
                         column: x => x.Jugador1Id,
                         principalTable: "Jugadores",
-                        principalColumn: "JugadorId",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "JugadorId");
                     table.ForeignKey(
                         name: "FK_Partidas_Jugadores_Jugador2Id",
                         column: x => x.Jugador2Id,
@@ -49,9 +62,14 @@ namespace RegistroJugadores.Migrations
                         name: "FK_Partidas_Jugadores_TurnoJugadorId",
                         column: x => x.TurnoJugadorId,
                         principalTable: "Jugadores",
-                        principalColumn: "JugadorId",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "JugadorId");
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Jugadores_Nombres",
+                table: "Jugadores",
+                column: "Nombres",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Partidas_GanadorId",
@@ -79,6 +97,9 @@ namespace RegistroJugadores.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Partidas");
+
+            migrationBuilder.DropTable(
+                name: "Jugadores");
         }
     }
 }

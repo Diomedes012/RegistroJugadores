@@ -12,8 +12,8 @@ using RegistroJugadores.DAL;
 namespace RegistroJugadores.Migrations
 {
     [DbContext(typeof(Contexto))]
-    [Migration("20250912200420_PartidasInicial")]
-    partial class PartidasInicial
+    [Migration("20250913020058_Inicial")]
+    partial class Inicial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -101,22 +101,24 @@ namespace RegistroJugadores.Migrations
                 {
                     b.HasOne("RegistroJugadores.Models.Jugadores", "Ganador")
                         .WithMany()
-                        .HasForeignKey("GanadorId");
+                        .HasForeignKey("GanadorId")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("RegistroJugadores.Models.Jugadores", "Jugador1")
                         .WithMany()
                         .HasForeignKey("Jugador1Id")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("RegistroJugadores.Models.Jugadores", "Jugador2")
                         .WithMany()
-                        .HasForeignKey("Jugador2Id");
+                        .HasForeignKey("Jugador2Id")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("RegistroJugadores.Models.Jugadores", "TurnoJugador")
                         .WithMany()
                         .HasForeignKey("TurnoJugadorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("Ganador");

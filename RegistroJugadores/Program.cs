@@ -22,6 +22,7 @@ namespace RegistroJugadores;
 
             //Inyeccion del service
             builder.Services.AddScoped<JugadoresService>();
+            builder.Services.AddScoped<PartidasService>();
 
             var app = builder.Build();
 

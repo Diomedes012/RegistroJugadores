@@ -66,6 +66,9 @@ public class PartidasService(IDbContextFactory<Contexto> DbFactory)
         await using var contexto = await DbFactory.CreateDbContextAsync();
         return await contexto.Partidas
             .Where(criterio)
+            .Include(partida => partida.Jugador1)
+            .Include(partida => partida.Jugador2)
+            .Include(partida => partida.Ganador)
             .AsNoTracking()
             .ToListAsync();
     }

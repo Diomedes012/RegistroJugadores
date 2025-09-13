@@ -98,22 +98,24 @@ namespace RegistroJugadores.Migrations
                 {
                     b.HasOne("RegistroJugadores.Models.Jugadores", "Ganador")
                         .WithMany()
-                        .HasForeignKey("GanadorId");
+                        .HasForeignKey("GanadorId")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("RegistroJugadores.Models.Jugadores", "Jugador1")
                         .WithMany()
                         .HasForeignKey("Jugador1Id")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("RegistroJugadores.Models.Jugadores", "Jugador2")
                         .WithMany()
-                        .HasForeignKey("Jugador2Id");
+                        .HasForeignKey("Jugador2Id")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("RegistroJugadores.Models.Jugadores", "TurnoJugador")
                         .WithMany()
                         .HasForeignKey("TurnoJugadorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("Ganador");
