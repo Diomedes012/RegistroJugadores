@@ -13,7 +13,11 @@ namespace RegistroJugadores.Models;
         [Required(ErrorMessage = "El campo Nombres es obligatorio")]
 
         [Range(0, int.MaxValue, ErrorMessage = "El campo Ganadas no puede ser negativo")]
-        public int Partidas { get; set; }
+        public int Victorias { get; set; } = 0;
+
+        public int Derrotas { get; set; } = 0;
+
+        public int Empates { get; set; } = 0;
         
     }
 
