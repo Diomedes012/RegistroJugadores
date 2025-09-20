@@ -1,0 +1,78 @@
+﻿@page "/"
+@inject JugadoresService jugadoresService
+@inject PartidasService partidasService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+
+<div class="selection-screen">
+    <h1>Elige tu jugador</h1>
+    <div class="player-buttons">
+        <label for="jugador1" class="form-label">Jugador 1 (X)</label>
+        <InputSelect id="jugador1" class="form-select" @bind-Value="jugador1.JugadorId">
+            <option value="0">Seleccione Jugador 1 (X)</option>
+            @foreach (var jugador in jugadores)
+            {
+                <option value="@jugador.JugadorId" disabled="@(jugador.JugadorId == jugador2.JugadorId)">@jugador.Nombres</option>
+            }
+        </InputSelect>
+
+        <label for="jugador2" class="form-label">Jugador 2 (O)</label>
+        <InputSelect id="jugador2" class="form-select" @bind-Value="jugador2.JugadorId">
+            <option value="0">Seleccione Jugador 2 (O)</option>
+            @foreach (var jugador in jugadores)
+            {
+                <option value="@jugador.JugadorId" disabled="@(jugador.JugadorId == jugador1.JugadorId)">@jugador.Nombres</option>
+            }
+        </InputSelect>
+    </div>
+    <button class="btn btn-success btn-lg mt-4"
+            disabled="@(jugador1.JugadorId == 0)"
+            @onclick="StartGame">
+        Iniciar Partida
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(Mensaje))
+{
+    <div class="alert @MensajeCssClass mt-3">
+        @Mensaje
+    </div>
+}
+
+@code {
+    public Jugadores jugador1 { get; set; } = new Jugadores();
+    public Jugadores jugador2 { get; set; } = new Jugadores(); 
+    public List<Jugadores> jugadores { get; set; } = new List<Jugadores>();
+    public string Mensaje { get; set; } = string.Empty;
+    public string MensajeCssClass { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        jugadores = await jugadoresService.Listar(jugadpr => true);
+    }
+
+    private async Task StartGame()
+    {
+        var nuevaPartida = new Partidas
+            {
+                Jugador1Id = jugador1.JugadorId,
+                Jugador2Id = jugador2.JugadorId,
+                EstadoPartida = "Iniciada",
+                TurnoJugadorId = jugador1.JugadorId,
+                FechaInicio = DateTime.Now
+            };
+
+        var guardada = await partidasService.Guardar(nuevaPartida);
+
+        if(guardada)
+        {
+            navigationManager.NavigateTo($"Juego/{nuevaPartida.PartidaId}");
+        }
+        else
+        {
+            Mensaje = "Ocurrió un error al iniciar la partida.";
+            MensajeCssClass = "alert alert-danger";
+        }
+    }
+
+}
