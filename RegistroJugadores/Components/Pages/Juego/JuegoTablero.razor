@@ -1,24 +1,46 @@
-﻿@page "Juego/Tablero/{PartidaId: int}"
+﻿@page "/Juego/Tablero/{PartidaId:int}"
 @inject PartidasService partidasService
+@inject JugadoresService jugadoresService
+@inject NavigationManager navigationManager
 @rendermode InteractiveServer
 
 <div class="container mx-auto max-w-lg p-6 bg-white rounded-lg shadow-xl text-center">
 
-    <div class="game-container">
-        {
-            <!-- PANTALLA DE JUEGO -->
+    @if (partida == null || jugadorX == null)
+    {
+        <p>Cargando partida...</p>
+    }
+    else
+    {
+        <div class="game-container">
             <div class="game-screen">
-                <h2 class="game-status">@GameStatus</h2>
+                @if (partida.Jugador2Id == null)
+                {
+                    <h2 class="game-status">Turno de: @jugadorX.Nombres</h2>
+                    <p>Elige el Jugador 2</p>
+
+                    <InputSelect @bind-Value="partida.Jugador2Id" @onchange="Jugador2Elegido">
+                        <option value="">Selecciona un jugador</option>
+                        @foreach (var jugador in jugadoresDisponibles.Where(jugador => jugador.JugadorId != jugadorX.JugadorId))
+                        {
+                            <option value="@jugador.JugadorId">@jugador.Nombres</option>
+                        }
+                    </InputSelect>
+                }
+                else
+                {
+                    <h2 class="game-status">@GameStatus</h2>
+                }
 
                 <div class="game-board">
                     @for (var i = 0; i < 9; i++)
                     {
-                        var cellIndex = i; // Copia local para evitar problemas con el closure en el lambda
-                                           <button class="cell @GetPlayerClass(board[cellIndex])"
-                                                   @onclick="() => HandleCellClick(cellIndex)"
-                                                   disabled="@(board[cellIndex] != null || winner != null || esEmpate)">
-                                               @board[cellIndex]?.ToString()
-                                           </button>
+                        var cellIndex = i;
+                        <button class="cell @GetPlayerClass(board[cellIndex])"
+                                @onclick="() => HandleCellClick(cellIndex)"
+                                disabled="@(board[cellIndex] != null || partida.EstadoPartida != "En curso")">
+                            @board[cellIndex]?.ToString()
+                        </button>
                     }
                 </div>
 
@@ -26,89 +48,186 @@
                     Reiniciar Juego
                 </button>
             </div>
-        }
-    </div>
+        </div>
+    }
 </div>
 @code {
     [Parameter]
     public int PartidaId { get; set; }
 
+    private Partidas partida;
+    private Jugadores jugadorX;
+    private Jugadores jugadorO;
+    private List<Jugadores> jugadoresDisponibles;
     private enum PlayerType { X, O }
 
-    private bool gameStarted;
-    private PlayerType? playerTypeSelection;
     private PlayerType?[] board = new PlayerType?[9];
-    private PlayerType _currentPlayerType = PlayerType.X;
-    private PlayerType? winner;
-    private bool esEmpate;
+    private PlayerType _currentPlayerType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatosIniciales();
+        await CargarEstadoJuego();
+    }
+
+    private async Task CargarDatosIniciales()
+    {
+        partida = await partidasService.Buscar(PartidaId);
+
+        if (partida == null)
+        {
+            navigationManager.NavigateTo("/Partidas");
+            return;
+        }
+
+        jugadorX = await jugadoresService.Buscar(partida.Jugador1Id);
+        jugadorO = partida.Jugador2Id.HasValue
+            ? await jugadoresService.Buscar(partida.Jugador2Id.Value)
+            : null;
+        partida.Ganador = partida.GanadorId.HasValue
+            ? await jugadoresService.Buscar(partida.GanadorId.Value)
+            : null;
+
+        jugadoresDisponibles = await jugadoresService.Listar(p => true);
+    }
+
+    private async Task Jugador2Elegido()
+    {
+        if (partida.Jugador2Id.HasValue)
+        {
+            jugadorO = await jugadoresService.Buscar(partida.Jugador2Id.Value);
+
+            if (jugadorO != null)
+            {
+                partida.TurnoJugadorId = jugadorX.JugadorId;
+                partida.EstadoPartida = "En curso";
+                await partidasService.Guardar(partida);
+                await CargarEstadoJuego();
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task CargarEstadoJuego()
+    {
+        if (partida == null)
+            return;
+
+        if (!string.IsNullOrEmpty(partida.EstadoTablero))
+        {
+            var estadoTablero = partida.EstadoTablero;
+            for (int i = 0; i < 9; i++)
+            {
+                board[i] = estadoTablero[i] switch
+                {
+                    'X' => PlayerType.X,
+                    'O' => PlayerType.O,
+                    _ => null
+                };
+            }
+        }
+        else
+        {
+            board = new PlayerType?[9];
+        }
+
+        if (partida.Jugador2Id.HasValue)
+        {
+            _currentPlayerType = partida.TurnoJugadorId == jugadorX?.JugadorId ? PlayerType.X : PlayerType.O;
+        }
+        else
+        {
+            _currentPlayerType = PlayerType.X;
+        }
+    }
 
     private string GameStatus
     {
         get
         {
-            if (winner != null) return $"🏆 ¡Ganador: {winner}!";
-            return esEmpate
-                ? "🤝 ¡Es un empate!"
-                : $"Turno de: {_currentPlayerType}";
+            if (partida == null)
+                return "";
+
+            if (partida.EstadoPartida == "En curso")
+            {
+                var jugadorActual = partida.TurnoJugadorId == jugadorX?.JugadorId ? jugadorX?.Nombres : jugadorO?.Nombres ?? "Jugador 2";
+                return $"Turno de: {jugadorActual}";
+            }
+            if (partida.EstadoPartida == "Terminada")
+            {
+                return $"🏆 ¡Ganador: {(partida.Ganador?.Nombres ?? "Desconocido")}!";
+            }
+            if (partida.EstadoPartida == "Empate")
+            {
+                return "🤝 ¡Es un empate!";
+            }
+            return "";
         }
     }
 
-
-    private void SelectPlayerType(PlayerType playerType)
+    private async Task HandleCellClick(int index)
     {
-        playerTypeSelection = playerType;
-        StateHasChanged();
-    }
-
-    private void SelectPlayerX()
-    {
-        playerTypeSelection = PlayerType.X;
-    }
-
-    private void StartGame()
-    {
-        if (playerTypeSelection.HasValue)
-        {
-            gameStarted = true;
-        }
-    }
-
-    private void HandleCellClick(int index)
-    {
-        // Ignorar si la celda está ocupada o el juego terminó
-        if (board[index] != null || winner != null || esEmpate)
+        if (partida == null || board[index] != null || partida.EstadoPartida != "En curso")
         {
             return;
         }
 
         board[index] = _currentPlayerType;
 
-        winner = CheckForWinner();
+        if (!partida.Jugador2Id.HasValue)
+        {
+            partida.EstadoTablero = string.Join("", board.Select(p => p?.ToString() ?? " "));
+            await partidasService.Guardar(partida);
+            StateHasChanged();
+            return;
+        }
+
+        var winner = CheckForWinner();
+        bool esEmpate = board.All(cell => cell != null) && winner == null;
+
         if (winner != null)
         {
-            return; // El juego termina
-        }
+            partida.EstadoPartida = "Terminada";
+            partida.GanadorId = winner == PlayerType.X ? jugadorX?.JugadorId ?? 0 : jugadorO?.JugadorId ?? 0;
+            partida.FechaFin = DateTime.Now;
 
-        // Comprobar empate
-        esEmpate = board.All(cell => cell != null);
-        if (esEmpate)
+            await jugadoresService.Guardar(jugadorX);
+            await jugadoresService.Guardar(jugadorO);
+            await partidasService.Guardar(partida);
+
+            await CargarDatosIniciales();
+            await CargarEstadoJuego();
+            StateHasChanged();
+        }
+        else if (esEmpate)
         {
-            return; // El juego termina
-        }
+            partida.EstadoPartida = "Empate";
+            partida.FechaFin = DateTime.Now;
 
-        // Cambiar turno
-        _currentPlayerType = (_currentPlayerType == PlayerType.X)
-            ? PlayerType.O
-            : PlayerType.X;
+            if (jugadorX != null) jugadorX.Empates++;
+            if (jugadorO != null) jugadorO.Empates++;
+            await jugadoresService.Guardar(jugadorX);
+            await jugadoresService.Guardar(jugadorO);
+            await partidasService.Guardar(partida);
+        }
+        else
+        {
+            _currentPlayerType = (_currentPlayerType == PlayerType.X) ? PlayerType.O : PlayerType.X;
+            partida.TurnoJugadorId = (_currentPlayerType == PlayerType.X) ? jugadorX?.JugadorId ?? 0 : jugadorO?.JugadorId ?? 0;
+        }
+        partida.EstadoTablero = string.Join("", board.Select(p => p?.ToString() ?? " "));
+        await partidasService.Guardar(partida);
+
+        StateHasChanged();
     }
 
     private PlayerType? CheckForWinner()
     {
         var winningLines = new[]
         {
-             new[] {0, 1, 2}, new[] {3, 4, 5}, new[] {6, 7, 8},// Horizontales
-             new[] {0, 3, 6}, new[] {1, 4, 7}, new[] {2, 5, 8},// Verticales
-             new[] {0, 4, 8}, new[] {2, 4, 6}// Diagonales
+             new[] {0, 1, 2}, new[] {3, 4, 5}, new[] {6, 7, 8},
+             new[] {0, 3, 6}, new[] {1, 4, 7}, new[] {2, 5, 8},
+             new[] {0, 4, 8}, new[] {2, 4, 6}
         };
 
         foreach (var line in winningLines)
@@ -120,17 +239,24 @@
             }
         }
 
-        return null; // No hay ganador
+        return null;
     }
 
-    private void RestartGame()
+    private async Task RestartGame()
     {
-        gameStarted = false;
-        playerTypeSelection = null;
-        board = new PlayerType?[9];
-        _currentPlayerType = PlayerType.X;
-        winner = null;
-        esEmpate = false;
+        if (partida == null)
+            return;
+
+        partida.EstadoPartida = "En curso";
+        partida.EstadoTablero = string.Empty;
+        partida.TurnoJugadorId = jugadorX?.JugadorId ?? 0;
+        partida.GanadorId = null;
+        partida.FechaFin = null;
+
+        await partidasService.Guardar(partida);
+        await CargarDatosIniciales();
+        await CargarEstadoJuego();
+        StateHasChanged();
     }
 
     private string GetPlayerClass(PlayerType? player)
@@ -138,5 +264,4 @@
         if (!player.HasValue) return "";
         return player == PlayerType.X ? "player-x" : "player-o";
     }
-
 }
