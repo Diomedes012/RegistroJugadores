@@ -23,9 +23,8 @@ namespace RegistroJugadores;
             //Inyeccion del service
             builder.Services.AddScoped<JugadoresService>();
             builder.Services.AddScoped<PartidasService>();
-            builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://gestionhuacalesapi.azurewebsites.net/") }); //No se si esta correcto
 
-        var app = builder.Build();
+            var app = builder.Build();
 
             // Configure the HTTP request pipeline.
             if (!app.Environment.IsDevelopment())
