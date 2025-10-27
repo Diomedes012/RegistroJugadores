@@ -9,7 +9,7 @@ public class MovimientosApiService(HttpClient httpClient) : IMovimientosApiServi
     {
         try
         {
-            var response = await httpClient.GetFromJsonAsync<List<MovimientoResponse>>($"api/Movimientos{partidaId}");
+            var response = await httpClient.GetFromJsonAsync<List<MovimientoResponse>>($"api/Movimientos/{partidaId}");
             return new Resource<List<MovimientoResponse>>.Success(response ?? []);
         }
         catch (Exception ex)
@@ -18,23 +18,28 @@ public class MovimientosApiService(HttpClient httpClient) : IMovimientosApiServi
         }
     }
 
-    public async Task<Resource<MovimientoResponse>> PostMovimiento(int PartidaId, string Jugador, int PosicionFila, int PosicionColumna)
+    public async Task<Resource<bool>> PostMovimiento(int PartidaId, string Jugador, int PosicionFila, int PosicionColumna)
     {
         var request = new MovimientoRequest(PartidaId, Jugador, PosicionFila, PosicionColumna);
         try
         {
             var response = await httpClient.PostAsJsonAsync("api/Movimientos", request);
             response.EnsureSuccessStatusCode();
-            var created = await response.Content.ReadFromJsonAsync<MovimientoResponse>();
-            return new Resource<MovimientoResponse>.Success(created!);
+
+            return new Resource<bool>.Success(true);
         }
         catch (HttpRequestException ex)
         {
-            return new Resource<MovimientoResponse>.Error($"Error de red: {ex.Message}");
+            return new Resource<bool>.Error($"Error de red: {ex.Message}");
         }
         catch (NotSupportedException)
         {
-            return new Resource<MovimientoResponse>.Error("Respuesta inválida del servidor.");
+            return new Resource<bool>.Error("Respuesta inválida del servidor.");
+        }
+
+        catch (Exception ex)
+        {
+            return new Resource<bool>.Error(ex.Message);
         }
     }
 }

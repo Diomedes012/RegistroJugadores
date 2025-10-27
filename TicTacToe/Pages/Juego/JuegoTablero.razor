@@ -1,0 +1,344 @@
+﻿@page "/Juego/Tablero/{PartidaId:int}"
+@using TicTacToe.Services
+@using TicTacToe.Dtos
+@inject IPartidaApiService PartidaApiService
+@inject IJugadoresApiService JugadorApiService
+@inject IMovimientosApiService MovimientoApiService
+@inject NavigationManager navigationManager
+@inject IJSRuntime JSRuntime
+
+@implements IDisposable
+
+<div class="container mx-auto max-w-lg p-6 bg-white rounded-lg shadow-xl text-center">
+
+    @if (_isLoading && partida == null)
+    {
+        <p>Cargando partida...</p>
+    }
+    else if (partida != null)
+    {
+        <div class="game-container">
+            <div class="game-screen">
+                @if (partida.Jugador2Id == null)
+                {
+                    <h2 class="game-status">Turno de: @(jugadorX?.Nombres ?? "Jugador 1")</h2>
+                    <p>Elige el Jugador 2</p>
+                    
+                    <InputSelect class="form-select" @bind-value="selectedJugador2Id" @onchange="Jugador2Elegido">
+                        <option value="0">Selecciona un jugador</option>
+                        @foreach (var jugador in jugadoresDisponibles.Where(j => j.JugadorId != jugadorX?.JugadorId))
+                        {
+                            <option value="@jugador.JugadorId">@jugador.Nombres</option>
+                        }
+                    </InputSelect>
+                }
+                else
+                {
+                    <h2 class="game-status">@GameStatus</h2>
+                }
+
+                <div class="game-board">
+                    @for (var i = 0; i < 9; i++)
+                    {
+                        var cellIndex = i;
+                        <button class="cell @GetPlayerClass(board[cellIndex])"
+                                @onclick="() => HandleCellClick(cellIndex)"
+                                disabled="@(board[cellIndex] != null || !EsMiTurno() || _localEstadoPartida != "En curso" || _isPostingMove)">
+                            @board[cellIndex]?.ToString()
+                        </button>
+                    }
+                </div>
+
+                @if (_miJugadorId == 0)
+                {
+                    <div class="mt-4 p-3 border rounded" style="background-color: #fffbe6;">
+                        <h5>¡Elige quién eres!</h5>
+                        <p class="mb-2">
+                            (Solo puedes elegir una vez por partida)
+                        </p>
+                        <button class="btn btn-primary btn-sm" @onclick="() => JugarComo(jugadorX)" disabled="@(jugadorX == null)">
+                            Jugar como @(jugadorX?.Nombres ?? "J1")
+                        </button>
+                        <button class="btn btn-info btn-sm text-white" @onclick="() => JugarComo(jugadorO)" disabled="@(jugadorO == null)">
+                            Jugar como @(jugadorO?.Nombres ?? "J2")
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="mt-4 p-3 border rounded" style="background-color: #e6f7ff;">
+                        <p class="mb-0">
+                            Estás jugando como: 
+                            <strong>
+                                @if (_miJugadorId == jugadorX?.JugadorId) { <text>@jugadorX.Nombres (X)</text> }
+                                else if (_miJugadorId == jugadorO?.JugadorId) { <text>@jugadorO.Nombres (O)</text> }
+                            </strong>
+                        </p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int PartidaId { get; set; }
+
+    private PartidaResponse? partida;
+    private JugadorResponse? jugadorX;
+    private JugadorResponse? jugadorO;
+    private List<JugadorResponse> jugadoresDisponibles = new();
+    private List<MovimientoResponse> movimientos = new();
+
+    private enum PlayerType { X, O }
+    private PlayerType?[] board = new PlayerType?[9];
+    private string _localEstadoPartida = "Cargando...";
+    private int? _localTurnoJugadorId;
+    private JugadorResponse? ganador; 
+
+
+    private bool _isLoading = true;
+    private bool _isPostingMove = false;
+    private System.Threading.Timer? _pollingTimer;
+    private int? selectedJugador2Id;
+
+    private int _miJugadorId = 0;
+    private string LocalStorageKey => $"tic-tac-toe-identity-{PartidaId}"; // Key única por partida
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+
+        try
+        {
+            var savedIdStr = await JSRuntime.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+            if (!string.IsNullOrEmpty(savedIdStr) && int.TryParse(savedIdStr, out int savedId))
+            {
+                _miJugadorId = savedId;
+            }
+        }
+        catch
+        {
+            
+        }
+
+        await CargarDatosYCalcularEstadoAsync();
+        _isLoading = false;
+
+        _pollingTimer = new Timer(async _ =>
+        {
+            await PollForChanges();
+        }, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+    }
+
+    private async Task CargarDatosYCalcularEstadoAsync()
+    {
+
+        var partidaResult = await PartidaApiService.GetPartidaAsync(PartidaId);
+
+
+        var partidaData = ((Resource<PartidaResponse>.Success)partidaResult).Data;
+
+        partida = partidaData;
+        selectedJugador2Id = partida.Jugador2Id;
+
+        var j1Result = await JugadorApiService.GetJugadoresAsync(partida.Jugador1Id);
+        if (j1Result is Resource<JugadorResponse>.Success s1) jugadorX = s1.Data;
+        
+        if (partida.Jugador2Id.HasValue)
+        {
+            var j2Result = await JugadorApiService.GetJugadoresAsync(partida.Jugador2Id.Value);
+            if (j2Result is Resource<JugadorResponse>.Success s2) jugadorO = s2.Data;
+        }
+
+        var jugadoresResult = await JugadorApiService.GetJugadoresAsync();
+        if (jugadoresResult is Resource<List<JugadorResponse>>.Success sList) jugadoresDisponibles = sList.Data ?? new();
+
+        var movimientosResult = await MovimientoApiService.GetMovimientoAsync(PartidaId);
+        if (movimientosResult is Resource<List<MovimientoResponse>>.Success sMov) movimientos = sMov.Data ?? new();
+
+        CalcularEstadoDelJuego();
+    }
+
+
+    private void ReconstruirTablero()
+    {
+        board = new PlayerType?[9];
+        foreach (var mov in movimientos.OrderBy(m => m.MovimientoId))
+        {
+            int index = (mov.PosicionFila * 3) + mov.PosicionColumna;
+            if (index >= 0 && index < 9)
+            {
+                board[index] = mov.Jugador == "X" ? PlayerType.X : PlayerType.O;
+            }
+        }
+    }
+
+    private void CalcularEstadoDelJuego()
+    {
+        ReconstruirTablero();
+
+        PlayerType? winnerType = CheckForWinner();
+        if (winnerType != null)
+        {
+            _localEstadoPartida = "Terminada";
+            ganador = (winnerType == PlayerType.X) ? jugadorX : jugadorO;
+            _localTurnoJugadorId = null; 
+            return;
+        }
+        
+        if (movimientos.Count == 9)
+        {
+            _localEstadoPartida = "Empate";
+            ganador = null;
+            _localTurnoJugadorId = null;
+            return;
+        }
+        
+        if (partida.Jugador2Id == null && movimientos.Count == 0)
+        {
+            _localEstadoPartida = "Esperando Jugador 2";
+            return;
+        }
+
+        _localEstadoPartida = "En curso";
+        _localTurnoJugadorId = (movimientos.Count % 2 == 0) ? partida.Jugador1Id : partida.Jugador2Id;
+    }
+
+    private PlayerType? CheckForWinner()
+    {
+        var winningLines = new[]
+        {
+             new[] {0, 1, 2}, new[] {3, 4, 5}, new[] {6, 7, 8},
+             new[] {0, 3, 6}, new[] {1, 4, 7}, new[] {2, 5, 8},
+             new[] {0, 4, 8}, new[] {2, 4, 6}
+        };
+
+        foreach (var line in winningLines)
+        {
+            var (a, b, c) = (line[0], line[1], line[2]);
+            if (board[a].HasValue && board[a] == board[b] && board[a] == board[c])
+            {
+                return board[a];
+            }
+        }
+        return null;
+    }
+
+    private async Task HandleCellClick(int index)
+    {
+        if (partida == null || !EsMiTurno() || board[index] != null || _localEstadoPartida != "En curso" || _isPostingMove)
+        {
+            return;
+        }
+
+        _isPostingMove = true;
+        
+        try
+        {
+            int fila = index / 3;
+            int columna = index % 3;
+            string simboloJugador = (_localTurnoJugadorId == jugadorX?.JugadorId) ? "X" : "O";
+
+            var postResult = await MovimientoApiService.PostMovimiento(PartidaId, simboloJugador, fila, columna);
+
+
+            await CargarDatosYCalcularEstadoAsync();
+        }
+        catch (Exception ex)
+        {
+        }
+        finally
+        {
+            _isPostingMove = false;
+            StateHasChanged(); 
+        }
+    }
+
+    private bool EsMiTurno()
+    {
+        if (partida == null || _localEstadoPartida != "En curso") return false;
+        return _localTurnoJugadorId == _miJugadorId;
+    }
+
+    private async Task PollForChanges()
+    {
+        if (_isLoading || _isPostingMove || partida == null || EsMiTurno() || _localEstadoPartida != "En curso")
+        {
+            return;
+        }
+
+        var movimientosResult = await MovimientoApiService.GetMovimientoAsync(PartidaId);
+
+        if (movimientosResult is Resource<List<MovimientoResponse>>.Success sMov)
+        {
+            if ((sMov.Data?.Count ?? 0) > movimientos.Count)
+            {
+                await CargarDatosYCalcularEstadoAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private async Task Jugador2Elegido()
+    {
+       
+        if (selectedJugador2Id.HasValue && selectedJugador2Id > 0)
+        {
+             await CargarDatosYCalcularEstadoAsync();
+        }
+    }
+
+    private string GameStatus
+    {
+        get
+        {
+            if (_localEstadoPartida == "En curso")
+            {
+                var jugadorActual = _localTurnoJugadorId == jugadorX?.JugadorId ? jugadorX?.Nombres : jugadorO?.Nombres ?? "Jugador 2";
+                return $"Turno de: {jugadorActual}";
+            }
+            if (_localEstadoPartida == "Terminada")
+            {
+                return $"🏆 ¡Ganador: {(ganador?.Nombres ?? "Desconocido")}!";
+            }
+            if (_localEstadoPartida == "Empate")
+            {
+                return "🤝 ¡Es un empate!";
+            }
+            return _localEstadoPartida; 
+        }
+    }
+
+    private string GetPlayerClass(PlayerType? player)
+    {
+        if (!player.HasValue) return "";
+        return player == PlayerType.X ? "player-x" : "player-o";
+    }
+
+
+    private async Task JugarComo(JugadorResponse? jugador)
+    {
+        if (jugador != null)
+        {
+            _miJugadorId = jugador.JugadorId;
+            
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, _miJugadorId.ToString());
+            }
+            catch (Exception)
+            {
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        _pollingTimer?.Dispose();
+    }
+}
+

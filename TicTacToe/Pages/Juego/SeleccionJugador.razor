@@ -1,0 +1,99 @@
+﻿@page "/"
+@using TicTacToe.Services
+@using TicTacToe.Dtos
+@inject IJugadoresApiService JugadorApiService
+@inject IPartidaApiService PartidaApiService
+@inject NavigationManager navigationManager
+
+<div class="container mx-auto max-w-lg p-6 bg-white rounded-lg shadow-xl text-center">
+    <div class="selection-screen">
+        <h1>Elige tu jugador</h1>
+        <div class="player-buttons">
+            <label for="jugador1" class="form-label">Jugador 1 (X)</label>
+
+            <InputSelect id="jugador1" class="form-select" @bind-value="jugador1Id">
+                <option value="0">Seleccione Jugador 1 (X)</option>
+                @foreach (var jugador in jugadores)
+                {
+                    <option value="@jugador.JugadorId" disabled="@(jugador.JugadorId == jugador2Id)">@jugador.Nombres</option>
+                }
+            </InputSelect>
+
+            <label for="jugador2" class="form-label">Jugador 2 (O)</label>
+
+            <InputSelect id="jugador2" class="form-select" @bind-value="jugador2Id">
+                <option value="0">Seleccione Jugador 2 (O)</option>
+                @foreach (var jugador in jugadores)
+                {
+                    <option value="@jugador.JugadorId" disabled="@(jugador.JugadorId == jugador1Id)">@jugador.Nombres</option>
+                }
+            </InputSelect>
+        </div>
+        <button class="btn btn-success btn-lg mt-4"
+                disabled="@(jugador1Id == 0 || jugador2Id == 0)"
+                @onclick="StartGame">
+            Iniciar Partida
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Mensaje))
+{
+    <div class="alert @MensajeCssClass mt-3">
+        @Mensaje
+    </div>
+}
+
+@code {
+    private int jugador1Id;
+    private int jugador2Id;
+
+    // Usamos tu DTO 'JugadorResponse'
+    private List<JugadorResponse> jugadores = new List<JugadorResponse>();
+
+    public string Mensaje { get; set; } = string.Empty;
+    public string MensajeCssClass { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await JugadorApiService.GetJugadoresAsync();
+
+        if (result is Resource<List<JugadorResponse>>.Success s)
+        {
+            // Evitar asignación nula
+            jugadores = s.Data ?? new List<JugadorResponse>();
+        }
+        else if (result is Resource<List<JugadorResponse>>.Error e)
+        {
+            Mensaje = $"Error al cargar jugadores: {e.Message}";
+            MensajeCssClass = "alert alert-danger";
+        }
+    }
+
+    private async Task StartGame()
+    {
+        Mensaje = string.Empty;
+
+        var result = await PartidaApiService.PostPartida(jugador1Id, jugador2Id);
+
+        if (result is Resource<PartidaResponse>.Success s)
+        {
+            var nuevaPartida = s.Data;
+            if (nuevaPartida is not null)
+            {
+                // nuevaPartida.PartidaId es seguro de usar porque comprobamos nullidad de nuevaPartida
+                navigationManager.NavigateTo($"/Juego/Tablero/{nuevaPartida.PartidaId}");
+            }
+            else
+            {
+                Mensaje = "La API devolvió una partida inválida.";
+                MensajeCssClass = "alert alert-danger";
+            }
+        }
+        else if (result is Resource<PartidaResponse>.Error e)
+        {
+            Mensaje = $"Error al iniciar partida: {e.Message}";
+            MensajeCssClass = "alert alert-danger";
+        }
+    }
+}
