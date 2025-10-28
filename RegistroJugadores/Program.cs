@@ -24,6 +24,9 @@ namespace RegistroJugadores;
             builder.Services.AddScoped<JugadoresService>();
             builder.Services.AddScoped<PartidasService>();
 
+            //Inyeccion del API
+            builder.Services.AddHttpClient("https://gestionhuacalesapi.azurewebsites.net/");
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
