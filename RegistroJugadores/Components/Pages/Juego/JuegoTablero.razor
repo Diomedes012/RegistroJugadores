@@ -5,6 +5,7 @@
 @inject NavigationManager navigationManager
 @inject PartidasApiService partidasApi
 @rendermode InteractiveServer
+@implements IDisposable
 
 <div class="container mx-auto max-w-lg p-6 bg-white rounded-lg shadow-xl text-center">
 
@@ -32,30 +33,44 @@
 
     @if (partidaIdActual != null)
     {
-        <div class="game-container">
-            <div class="game-screen">
-
-                <h2 class="game-status">@GameStatus</h2>
-
-                <div class="game-board">
-                    @for (var i = 0; i < 9; i++)
-                    {
-                        var cellIndex = i;
-                        <button class="cell @GetPlayerClass(board[cellIndex])"
-                                @onclick="() => HandleCellClick(cellIndex)"
-                                disabled="@(board[cellIndex] != null || juegoTerminado)">
-                            @board[cellIndex]?.ToString()
-                        </button>
-                    }
+        @if (!simboloElegido)
+        {
+            <div class="mb-4 p-4 border rounded-lg">
+                <h3 class="text-lg font-semibold">¿Con qué símbolo quieres jugar esta partida?</h3>
+                <div class="flex gap-4 justify-center mt-2">
+                    <button class="btn btn-primary" style="font-size: 1.5rem; width: 80px;" @onclick="@(() => ElegirSimbolo("X"))">
+                        X
+                    </button>
+                    <button class="btn btn-info" style="font-size: 1.5rem; width: 80px; color: white;" @onclick="@(() => ElegirSimbolo("O"))">
+                        O
+                    </button>
                 </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <div class="game-container">
+                <div class="game-screen">
+                    <h2 class="game-status">@GameStatus</h2>
+                    <div class="game-board">
+                        @for (var i = 0; i < 9; i++)
+                        {
+                            var cellIndex = i;
+                            <button class="cell @GetPlayerClass(board[cellIndex])"
+                                    @onclick="() => HandleCellClick(cellIndex)"
+                                    disabled="@(board[cellIndex] != null || juegoTerminado || jugadorActual != simboloJugadorActual || estaCargando)">
+                                @board[cellIndex]?.ToString()
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
     }
     else if (!estaCargando)
     {
         <p>Por favor, ingrese un ID de partida y presione "Cargar".</p>
     }
-
 </div>
 
 @code {
@@ -70,6 +85,10 @@
     private string jugadorActual = "X";
     private bool juegoTerminado = false;
 
+    private string? simboloJugadorActual;
+    private bool simboloElegido = false;
+
+    private System.Threading.Timer? _gameTimer;
 
     private async Task CargarJuego()
     {
@@ -77,9 +96,13 @@
 
         estaCargando = true;
         errorApi = null;
+        simboloElegido = false;
+        simboloJugadorActual = null;
         partidaIdActual = null;
         movimientosApi.Clear();
         partidaInfo = null;
+
+        _gameTimer?.Dispose();
 
         try
         {
@@ -88,7 +111,12 @@
             if (partidaInfo == null)
             {
                 errorApi = $"La Partida ID {partidaIdParaCargar.Value} no existe en la API.";
-                estaCargando = false;
+                return;
+            }
+
+            if (!partidaInfo.Jugador2Id.HasValue)
+            {
+                errorApi = "Esta partida aún está esperando al Jugador 2. No se pueden registrar movimientos.";
                 return;
             }
 
@@ -117,15 +145,58 @@
         }
     }
 
+    private void ElegirSimbolo(string simbolo)
+    {
+        simboloJugadorActual = simbolo;
+        simboloElegido = true;
+
+        _gameTimer = new System.Threading.Timer(ActualizarEstado, null, 3000, 3000);
+
+        StateHasChanged();
+    }
+
+    private async void ActualizarEstado(object? state)
+    {
+        if (estaCargando || !partidaIdActual.HasValue || juegoTerminado)
+        {
+            return;
+        }
+
+        await InvokeAsync(async () =>
+        {
+            if (estaCargando || !partidaIdActual.HasValue || juegoTerminado)
+            {
+                return;
+            }
+
+            try
+            {
+                var nuevosMovimientos = await partidasApi.ObtenerMovimientosAsync(partidaIdActual.Value);
+
+                if (nuevosMovimientos != null && nuevosMovimientos.Count != movimientosApi.Count)
+                {
+                    movimientosApi = nuevosMovimientos;
+                    ReconstruirTableroDesdeApi();
+                    DeterminarEstadoJuego();
+                    StateHasChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error en timer de refresco: {ex.Message}");
+            }
+        });
+    }
+
     private void ReconstruirTableroDesdeApi()
     {
-        board = new string?[9]; 
+        board = new string?[9];
         foreach (var mov in movimientosApi.OrderBy(m => m.MovimientoId))
         {
             int index = (mov.PosicionFila * 3) + mov.PosicionColumna;
             if (index >= 0 && index < 9)
             {
-                board[index] = mov.Jugador; // "X" o "O"
+                board[index] = mov.Jugador;
             }
         }
     }
@@ -133,17 +204,18 @@
     private void DeterminarEstadoJuego()
     {
         int numeroDeMovimientos = movimientosApi.Count;
-
         jugadorActual = (numeroDeMovimientos % 2 == 0) ? "X" : "O";
 
         var ganador = CheckForWinner();
         if (ganador != null)
         {
             juegoTerminado = true;
+            _gameTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         }
         else if (numeroDeMovimientos >= 9)
         {
             juegoTerminado = true;
+            _gameTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         }
         else
         {
@@ -153,47 +225,53 @@
 
     private async Task HandleCellClick(int index)
     {
+        errorApi = null;
+        if (jugadorActual != simboloJugadorActual)
+        {
+            errorApi = "¡Espera! No es tu turno.";
+            return;
+        }
         if (board[index] != null || juegoTerminado || !partidaIdActual.HasValue || estaCargando || partidaInfo == null)
         {
             return;
         }
-
         if (!partidaInfo.Jugador2Id.HasValue)
         {
             errorApi = "No se puede jugar, falta el Jugador 2.";
             return;
         }
 
-        estaCargando = true;
-        errorApi = null;
-        (int fila, int col) = (index / 3, index % 3);
+        estaCargando = true; 
 
-        var request = new MovimientoRequest
+        try 
         {
-            PartidaId = partidaIdActual.Value,
-            Jugador = jugadorActual,
-            PosicionFila = fila,
-            PosicionColumna = col
-        };
+            (int fila, int col) = (index / 3, index % 3);
+            var request = new MovimientoRequest
+            {
+                PartidaId = partidaIdActual.Value,
+                Jugador = jugadorActual,
+                PosicionFila = fila,
+                PosicionColumna = col
+            };
 
-        var respuestaApi = await partidasApi.EnviarMovimientoAsync(request);
+            var respuestaApi = await partidasApi.EnviarMovimientoAsync(request);
 
-        if (respuestaApi == null)
-        {
-            errorApi = "La API rechazó el movimiento. (¿Casilla ocupada? ¿Turno incorrecto?)";
+            if (respuestaApi == null)
+            {
+                errorApi = "La API rechazó el movimiento. (¿Casilla ocupada? ¿Turno incorrecto?)";
+            }
+            else
+            {
+                movimientosApi.Add(respuestaApi);
+                board[index] = respuestaApi.Jugador;
+                DeterminarEstadoJuego();
+            }
         }
-        else
+        finally
         {
-            movimientosApi.Add(respuestaApi);
-
-            board[index] = respuestaApi.Jugador;
-
-            DeterminarEstadoJuego();
+            estaCargando = false;
+            StateHasChanged();
         }
-
-        estaCargando = false;
-
-        StateHasChanged();
     }
 
     private string GameStatus
@@ -205,7 +283,14 @@
                 var ganador = CheckForWinner();
                 return ganador != null ? $"🏆 ¡Ganador: {ganador}!" : "🤝 ¡Es un empate!";
             }
-            return $"Turno de: {jugadorActual}";
+            if (simboloJugadorActual == jugadorActual)
+            {
+                return $"¡Es tu turno! Juegas como: {jugadorActual}";
+            }
+            else
+            {
+                return $"Esperando al Jugador {jugadorActual}... (Tú juegas como {simboloJugadorActual})";
+            }
         }
     }
 
@@ -213,9 +298,9 @@
     {
         var winningLines = new[]
         {
-            new[] {0, 1, 2}, new[] {3, 4, 5}, new[] {6, 7, 8}, // Horizontales
-            new[] {0, 3, 6}, new[] {1, 4, 7}, new[] {2, 5, 8}, // Verticales
-            new[] {0, 4, 8}, new[] {2, 4, 6}  // Diagonales
+            new[] {0, 1, 2}, new[] {3, 4, 5}, new[] {6, 7, 8},
+            new[] {0, 3, 6}, new[] {1, 4, 7}, new[] {2, 5, 8},
+            new[] {0, 4, 8}, new[] {2, 4, 6}
         };
 
         foreach (var line in winningLines)
@@ -233,5 +318,10 @@
     {
         if (player == null) return "";
         return player == "X" ? "player-x" : "player-o";
+    }
+
+    public void Dispose()
+    {
+        _gameTimer?.Dispose();
     }
 }
